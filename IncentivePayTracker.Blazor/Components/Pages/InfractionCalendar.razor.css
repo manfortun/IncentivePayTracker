@@ -1,0 +1,41 @@
+﻿.month {
+    background-color: white;
+    border-radius: 15px;
+    border: 1px solid transparent;
+    min-height: 12rem;
+    margin-bottom: 2.5rem;
+    padding: 1rem;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.month:hover {
+    border: 1px solid darkgray;
+}
+
+.infraction {
+    margin-right: .2rem;
+    font-size: 12px;
+}
+
+.infraction-div > span {
+    transition: all ease-in-out 0.1s;
+}
+
+.infraction-div:hover > span:not(:hover) {
+    color: gray;
+    opacity: 0.2;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animated-infraction {
+    animation: fadeIn 0.8s ease forwards;
+}

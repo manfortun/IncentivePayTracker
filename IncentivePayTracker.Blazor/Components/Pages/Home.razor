@@ -1,0 +1,256 @@
+﻿@page "/"
+
+@inject MessageService<EmpInfrEndpoint> EmployeeInfractionService
+@inject MessageService<InfractionEndpoint> InfractionService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+<div class="d-flex justify-content-center mt-3">
+    <div class="div-content mb-2">
+        <div class="mb-4 d-flex flex-row">
+            <div class="me-4">
+                <h3>Incentive Pay Tracker</h3>
+            </div>
+            <div class="ms-auto me-2">
+                <select class="form-select" @onchange="RefreshMonth">
+                    @foreach (var month in Months)
+                    {
+                        <option value="@month.Key" selected="@(_selectedMonth == month.Key)">@month.Value</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <select class="form-select" @onchange="RefreshYear">
+                    @foreach (var year in Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1))
+                    {
+                        <option value="@year" selected="@(_selectedYear == year)">@year</option>
+                    }
+                </select>
+            </div>
+        </div>
+        @if (!_isLoaded)
+        {
+            <div class="w-100 d-flex justify-content-center p-5">
+                <div class="spinner"></div>
+            </div>
+        }
+        else
+        {
+            <div class="mb-5">
+                <IPSummary Infractions="infractions" EmployeeInfractions="employeeInfractions"></IPSummary>
+            </div>
+            @if (employeeInfractions is not null)
+            {
+                <div class="mb-2">
+                    <input type="text" class="form-control" placeholder="Type a name to search..." @bind="_searchKey"/>
+                </div>
+                <div class="mb-4">
+                    <span>
+                        <input type="checkbox" @bind="_showWithInfractionsOnly" id="@nameof(_showWithInfractionsOnly)" class="me-1"/>
+                        <label for="@nameof(_showWithInfractionsOnly)" class="text-secondary"><small>Show employees with infractions only</small></label>
+                    </span>
+                </div>
+
+                var toDisplayEmployeeInfractions = employeeInfractions
+                        .Where(ei => _showWithInfractionsOnly ? ei.GetInfractionsCount() > 0 : true)
+                        .Where(ExecuteSearch)
+                        .OrderBy(ei => ei.Employee.LastName)
+                        .ThenBy(ei => ei.Employee.FirstName);
+
+                @if(toDisplayEmployeeInfractions?.Any() != true)
+                {
+                    <div class="text-secondary">No match found.</div>
+                }
+                else
+                {
+                    @foreach (var empInfr in toDisplayEmployeeInfractions)
+                    {
+                        int infrCount = empInfr.GetInfractionsCount();
+                        bool hasInfr = infrCount > 0;
+                        <div class="mb-2 record text-secondary row" @onclick="@(() => NavigationManager.NavigateTo($"EmployeeView/{empInfr.Employee.Id}"))" style="cursor: pointer">
+                            <div class="col-lg-6 col-8">
+                                <EmployeeName Employee="@empInfr.Employee"></EmployeeName>
+                                <Badge Show="@empInfr.Employee.IsExempted"></Badge>
+                            </div>
+                            <div class="col-2 d-lg-flex d-none flex-column">
+                                <div><strong class="@(hasInfr ? "text-danger" : "")">@empInfr.GetInfractionsTotal().ToString("N2")</strong></div>
+                                <div style="color: rgb(200, 200, 200); font-size: 12px;">Deductions (Php)</div>
+                            </div>
+                            <div class="col-2 d-lg-flex d-none flex-column">
+                                <div><strong>@empInfr.GetRemainingIncentive().ToString("N2")</strong></div>
+                                <div style="color: rgb(200, 200, 200); font-size: 12px;">Incentives (Php)</div>
+                            </div>
+                            <div class="col-lg-2 col-4 badge rounded-pill p-2 bg-light text-@(hasInfr ? "danger" : "black")">
+                                Infractions: @infrCount
+                            </div>
+                        </div>
+                    }
+                }
+            }
+            else
+            {
+                <div>No records for this date. Try selecting later dates.</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private int _selectedYear = DateTime.UtcNow.Year;
+    private int _selectedMonth = DateTime.UtcNow.Month;
+    private Dictionary<int, string> Months => Enumerable.Range(1, 12).ToDictionary(e => e, e => new DateTime(2000, e, 1).ToString("MMMM"));
+    private string _searchKey;
+    private bool _showWithInfractionsOnly = false;
+    private bool _isLoaded = false;
+
+    private IEnumerable<CompositeEmployeeInfraction> employeeInfractions;
+    private IEnumerable<Infraction> infractions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var iptReader = new IncentivePayTrackerReader();
+            var test = new List<CompositeEmployeeInfraction>();
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\January 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\February 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\March 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\April 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\May 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\June 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\July 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\August 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\September 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\October 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\November 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\December 2023.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\January 2024.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\February 2024.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\March 2024.txt"));
+            // test.AddRange(iptReader.Read(@"C:\Users\mfortun\Documents\April 2024.txt"));
+
+            // var testt = new HiredDateService();
+            // testt.GenerateBatch(
+            // @"C:\Users\mfortun\Documents\January 2023.txt",
+            // @"C:\Users\mfortun\Documents\February 2023.txt",
+            // @"C:\Users\mfortun\Documents\March 2023.txt",
+            // @"C:\Users\mfortun\Documents\April 2023.txt",
+            // @"C:\Users\mfortun\Documents\May 2023.txt",
+            // @"C:\Users\mfortun\Documents\June 2023.txt",
+            // @"C:\Users\mfortun\Documents\July 2023.txt",
+            // @"C:\Users\mfortun\Documents\August 2023.txt",
+            // @"C:\Users\mfortun\Documents\September 2023.txt",
+            // @"C:\Users\mfortun\Documents\October 2023.txt",
+            // @"C:\Users\mfortun\Documents\November 2023.txt",
+            // @"C:\Users\mfortun\Documents\December 2023.txt",
+            // @"C:\Users\mfortun\Documents\January 2024.txt",
+            // @"C:\Users\mfortun\Documents\February 2024.txt",
+            // @"C:\Users\mfortun\Documents\March 2024.txt",
+            // @"C:\Users\mfortun\Documents\April 2024.txt");
+
+            // var timeIns = new TimeInService();
+            // timeIns.GenerateBatch(
+            // @"C:\Users\mfortun\Documents\January 2023.txt",
+            // @"C:\Users\mfortun\Documents\February 2023.txt",
+            // @"C:\Users\mfortun\Documents\March 2023.txt",
+            // @"C:\Users\mfortun\Documents\April 2023.txt",
+            // @"C:\Users\mfortun\Documents\May 2023.txt",
+            // @"C:\Users\mfortun\Documents\June 2023.txt",
+            // @"C:\Users\mfortun\Documents\July 2023.txt",
+            // @"C:\Users\mfortun\Documents\August 2023.txt",
+            // @"C:\Users\mfortun\Documents\September 2023.txt",
+            // @"C:\Users\mfortun\Documents\October 2023.txt",
+            // @"C:\Users\mfortun\Documents\November 2023.txt",
+            // @"C:\Users\mfortun\Documents\December 2023.txt",
+            // @"C:\Users\mfortun\Documents\January 2024.txt",
+            // @"C:\Users\mfortun\Documents\February 2024.txt",
+            // @"C:\Users\mfortun\Documents\March 2024.txt",
+            // @"C:\Users\mfortun\Documents\April 2024.txt"
+            // );
+
+            var httpContext = HttpContextAccessor.HttpContext;
+
+            if (httpContext is null) return;
+
+            int total = test.Count;
+            int success = 0;
+            int fail = 0;
+            foreach (var t in test)
+            {
+                var response = await EmployeeInfractionService.PostAsync<Employee>(httpContext, t);
+
+                if (!response.Successful)
+                {
+                    fail++;
+                }
+                else
+                {
+                    success++;
+                }
+
+                Console.WriteLine($"Success: {success}, Fail: {fail}, Total: {total}");
+            }
+
+            var infractions = await InfractionService.GetAsync<IEnumerable<Infraction>>(httpContext);
+
+            if (infractions.Successful && infractions.Data is not null)
+            {
+                this.infractions = infractions.Data;
+            }
+
+            await RefreshEmployeeInfractionsAsync();
+        }
+        catch
+        {
+            // FALLTHROUGH
+        }
+    }
+
+    private async Task RefreshMonth(ChangeEventArgs e)
+    {
+        _selectedMonth = int.Parse(e.Value?.ToString() ?? DateTime.UtcNow.Month.ToString());
+        await RefreshEmployeeInfractionsAsync();
+    }
+
+    private async Task RefreshYear(ChangeEventArgs e)
+    {
+        _selectedYear = int.Parse(e.Value?.ToString() ?? DateTime.UtcNow.Year.ToString());
+        await RefreshEmployeeInfractionsAsync();
+    }
+
+    private async Task RefreshEmployeeInfractionsAsync()
+    {
+        _isLoaded = false;
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var employeeInfractions = await EmployeeInfractionService
+                .AddParameter("Composite")
+                .AddParameter($"{_selectedYear}-{_selectedMonth}")
+                .GetAsync<IEnumerable<CompositeEmployeeInfraction>>(httpContext);
+
+            if (employeeInfractions.Successful && employeeInfractions.Data is not null)
+            {
+                this.employeeInfractions = employeeInfractions.Data;
+            }
+        }
+        _isLoaded = true;
+    }
+
+    private bool ExecuteSearch(CompositeEmployeeInfraction empInfr)
+    {
+        if (string.IsNullOrEmpty(_searchKey)) return true;
+        if (empInfr.Employee.FirstName.Contains(_searchKey, StringComparison.OrdinalIgnoreCase)) return true;
+        else if (empInfr.Employee.LastName.Contains(_searchKey, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return false;
+    }
+
+    private CompositeInfraction? GetEmployeeInfraction(CompositeEmployeeInfraction empInfr, int infractionId)
+    {
+        return empInfr.Infractions?.FirstOrDefault(ei => ei.Infraction.Id == infractionId);
+    }
+}

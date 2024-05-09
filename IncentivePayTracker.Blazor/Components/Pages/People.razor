@@ -1,0 +1,104 @@
+﻿@page "/People"
+
+@inject MessageService<EmpInfrEndpoint> EmployeeInfractionService
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+@rendermode InteractiveServer
+
+<PageTitle>People</PageTitle>
+
+<div class="d-flex justify-content-center mt-3">
+    <div class="div-content">
+        <div class="me-4">
+            <h3>People</h3>
+        </div>
+        @if (!_isLoaded)
+        {
+            <div class="w-100 d-flex justify-content-center p-5">
+                <div class="spinner"></div>
+            </div>
+        }
+        else
+        {
+            @if (employeeInfractions is not null)
+            {
+                <div class="mb-3">
+                    <input type="text" class="form-control" placeholder="Type a name to search..." @bind="_searchKey"/>
+                </div>
+
+                var employeesToDisplay = employeeInfractions
+                            .Where(ExecuteSearch)
+                            .OrderBy(e => e.LastName)
+                            .ThenBy(e => e.FirstName);
+
+                @foreach (var employee in employeesToDisplay)
+                {
+                    double deduction = Math.Min(InfractionExtensions.TOTAL_INCENTIVE, employee.TotalInfractionsAmount);
+                    int percentage = (int)Math.Round(deduction / InfractionExtensions.TOTAL_INCENTIVE * 100);
+                    double remaining = InfractionExtensions.TOTAL_INCENTIVE - employee.TotalInfractionsAmount;
+                    <div class="record mb-2 p-3 row" style="cursor: pointer" @onclick="(() => HandlePersonClicked(employee.EmployeeId))">
+                        <div class="col-9">
+                            <span class="text-secondary"><strong class="text-black">@employee.LastName</strong>, @ToTitleCase(employee.FirstName)</span>
+                            <Badge Show="@employee.IsExempted"></Badge>
+                        </div>
+                        <div class="col-3 text-end text-secondary">
+                            <small>@remaining.ToString("#,##0") <span style="font-size: 11px;">/ @InfractionExtensions.TOTAL_INCENTIVE.ToString("#,##0")</span></small>
+                            <div class="progress" title="Remaining: @remaining.ToString("N2")">
+                                <div class="progress-bar-striped bg-danger" role="progressbar" style="width: @(percentage)%" title="Deduction: @deduction.ToString("N2")" aria-valuenow="percentage" aria-valuemin="0" aria-valuemax="100" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private bool _isLoaded = false;
+    private string _searchKey;
+    private IEnumerable<InfractionSummary> employeeInfractions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshEmployeesAsync();
+    }
+
+    private async Task RefreshEmployeesAsync()
+    {
+        _isLoaded = false;
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var employeeInfractions = await EmployeeInfractionService
+                .AddParameter("Summary")
+                .AddParameter($"{DateTime.UtcNow.Year}-{DateTime.UtcNow.Month}")
+                .GetAsync<IEnumerable<InfractionSummary>>(httpContext);
+
+            if (employeeInfractions.Successful && employeeInfractions.Data is not null)
+            {
+                this.employeeInfractions = employeeInfractions.Data;
+            }
+        }
+        _isLoaded = true;
+    }
+
+    private void HandlePersonClicked(int id)
+    {
+        NavigationManager.NavigateTo($"EmployeeView/{id}");
+    }
+
+    private bool ExecuteSearch(InfractionSummary infrSummary)
+    {
+        if (string.IsNullOrEmpty(_searchKey)) return true;
+        if (infrSummary.FirstName.Contains(_searchKey, StringComparison.OrdinalIgnoreCase)) return true;
+        else if (infrSummary.LastName.Contains(_searchKey, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return false;
+    }
+
+    private string ToTitleCase(string input)
+    {
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+    }
+}

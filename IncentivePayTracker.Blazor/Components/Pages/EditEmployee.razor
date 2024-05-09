@@ -1,0 +1,336 @@
+﻿@page "/EditEmployee/{id:int}"
+@using IncentivePayTracker.Blazor.ViewModels
+
+@inject MessageService<EmployeeEndpoint> EmployeeService
+@inject MessageService<EmploymentDateEndpoint> EmploymentDateService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IToastService ToastService
+
+@rendermode InteractiveServer
+
+<div class="d-flex justify-content-center mt-3">
+    <div class="div-content">
+        <div class="d-flex flex-row">
+            <h3>Edit Information</h3>
+            <button class="ms-auto btn btn-primary" title="Save changes" @onclick="Save"><i class="bi bi-floppy"></i></button>
+        </div>
+
+        @if (Employee is not null)
+        {
+            <div class="mt-4 mb-4 row">
+                <div class="mb-3 col-xl-6 col-12">
+                    <small>First Name:</small>
+                    <InputText @bind-Value="@Employee.FirstName" class="form-control" style="text-transform: uppercase; letter-spacing: 2px; font-family: monospace"></InputText>
+                </div>
+                <div class="col-xl-6 col-12">
+                    <small>Last Name:</small>
+                    <InputText @bind-Value="@Employee.LastName" class="form-control" style="text-transform: uppercase; letter-spacing: 2px; font-family: monospace"></InputText>
+                </div>
+            </div>
+
+            <div class="row history-div">
+                <div class="col-xl-6 col-12">
+                    <div class="d-flex flex-column justify-content-center">
+                        <h5 class="mb-4">Employment History</h5>
+                        @if (EmployeeInfo.EmploymentDates is not null)
+                        {
+                            @foreach (var ed in EmployeeInfo.EmploymentDates
+                                .OrderBy(d => d.YearHired)
+                                .ThenBy(d => d.MonthHired))
+                            {
+                                @if (ed.Equals(_confirmEmploymentDateDeletion))
+                                {
+                                    <div class="d-flex mb-2 flex-row justify-content-center">
+                                        <button class="btn btn-outline-danger me-1" @onclick="@(() => RemoveEmploymentDate(_confirmEmploymentDateDeletion))"><i class="bi bi-x"></i> Click to confirm deletion</button>
+                                        <button class="btn btn-warning ms-1" @onclick="@(() => _confirmEmploymentDateDeletion = default!)">Cancel</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-row justify-content-xl-between justify-content-around align-items-center mb-2">
+                                        <div class="d-flex flex-row">
+                                            <select @bind="@ed.MonthHired" class="form-select me-1" style="font-size: 12px; min-width: 110px;">
+                                                @if (EmployeeInfo.EmploymentDates.AvailableEmploymentDates(ed) is List<SelectableDate> employmentMonths)
+                                                {
+                                                    foreach (var date in employmentMonths.Where(s => s.Year == ed.YearHired))
+                                                    {
+                                                        <option value="@date.Month" selected="@(date.Month == ed.MonthHired)">@date.Value</option>
+                                                    }
+                                                }
+                                            </select>
+                                            <select @bind="@ed.YearHired" class="form-select" style="font-size: 12px;">
+                                                @if (EmployeeInfo.EmploymentDates.AvailableEmploymentDates(ed) is List<SelectableDate> employmentYears)
+                                                {
+                                                    @foreach (var year in employmentYears.Select(e => e.Year).Distinct())
+                                                    {
+                                                        <option value="@year" selected="@(year == ed.YearHired)">@year</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </div>
+                                        <span>-</span>
+                                        <div class="d-flex flex-row">
+                                            @if (ed.YearTerminated.HasValue && ed.MonthTerminated.HasValue)
+                                            {
+                                                <select @bind="@ed.MonthTerminated" class="form-select me-1" style="font-size: 12px; min-width: 110px;">
+                                                    @if (EmployeeInfo.EmploymentDates.AvailableTerminationDates(ed) is List<SelectableDate> terminationMonths)
+                                                    {
+                                                        foreach (var date in terminationMonths.Where(t => t.Year == ed.YearTerminated.Value))
+                                                        {
+                                                            <option value="@date.Month" selected="@(date.Month == ed.MonthTerminated.Value)">@date.Value</option>
+                                                        }
+                                                    }
+                                                </select>
+                                                <select @bind="@ed.YearTerminated" class="form-select" style="font-size: 12px;">
+                                                    @if (EmployeeInfo.EmploymentDates.AvailableTerminationDates(ed) is List<SelectableDate> terminationYears)
+                                                    {
+                                                        @foreach (var year in terminationYears.Select(t => t.Year).Distinct())
+                                                        {
+                                                            <option value="@year" selected="@(year == ed.YearTerminated)">@year</option>
+                                                        }
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <div>
+                                                    <button class="btn btn-warning" style="font-size: 12px;" @onclick="@(() => SetTerminationDate(ed))">Set termination date</button>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div>
+                                            <button class="btn text-danger" @onclick="@(() => _confirmEmploymentDateDeletion = ed)"><i class="bi bi-x"></i></button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        }
+
+                        @if (EmployeeInfo.EmploymentDates?.Any() != true ||
+                            EmployeeInfo.EmploymentDates.All(ed => ed.YearTerminated.HasValue))
+                        {
+                            <button class="btn btn-primary" @onclick="AddEmploymentRange"><i class="bi bi-plus me-2"></i>Add new employment range</button>
+                        }
+                    </div>
+                </div>
+                <div class="col-xl-6 col-12">
+                    <div class="d-flex flex-column justify-content-center">
+                        <h5 class="mb-4">Time In History</h5>
+                        @if (EmployeeInfo.TimeIns is not null)
+                        {
+                            @foreach (var timeIn in EmployeeInfo.TimeIns
+                                .OrderBy(t => t.Year)
+                                .ThenBy(t => t.Month))
+                            {
+                                @if (timeIn.Equals(_confirmEmployeeTimeInDeletion))
+                                {
+                                    <div class="d-flex mb-2 flex-row justify-content-center">
+                                        <button class="btn btn-outline-danger me-1" @onclick="@(() => RemoveTimeIn(_confirmEmployeeTimeInDeletion))"><i class="bi bi-x"></i> Click to confirm deletion</button>
+                                        <button class="btn btn-warning ms-1" @onclick="@(() => _confirmEmployeeTimeInDeletion = default!)">Cancel</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-row justify-content-xl-between justify-content-around align-items-center mb-2">
+                                        <div class="d-flex flex-row">
+                                            <select @bind="@timeIn.Month" class="form-select me-1" style="font-size: 12px; min-width: 110px;">
+                                                @foreach (var month in GetAvailableTimeInMonths(timeIn.Year, timeIn.Month))
+                                                {
+                                                    <option value="@month.Key" selected="@(month.Key == timeIn.Month)">@month.Value</option>
+                                                }
+                                            </select>
+                                            <select @bind="@timeIn.Year" class="form-select" style="font-size: 12px;">
+                                                @foreach (var year in Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1))
+                                                {
+                                                    <option value="@year" selected="@(year == timeIn.Year)">@year</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <span>:</span>
+                                        <div class="d-flex flex-row">
+                                            <input type="time" @bind="@timeIn.TimeIn" class="form-control" style="font-size: 12px; min-width: 110px;" />
+                                        </div>
+                                        <div>
+                                            <button class="btn text-danger" @onclick="@(() => _confirmEmployeeTimeInDeletion = timeIn)"><i class="bi bi-x"></i></button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        }
+
+                        <button class="btn btn-primary" @onclick="AddTimeIn"><i class="bi bi-plus me-2"></i>Add new time in</button>
+                        
+                        @* refresh at least twice for proper calculation of dates *@
+                        @if (_refreshCount >= 2)
+                        {
+                            _refreshCount = 0;
+                        }
+                        else
+                        {
+                            _refreshCount++;
+                            StateHasChanged();
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int id { get; set; }
+    private EmployeeCompleteInformation EmployeeInfo { get; set; } = default!;
+    private Employee Employee => EmployeeInfo?.Employee ?? default!;
+    private int _refreshCount = 0;
+    private EmploymentDate? _confirmEmploymentDateDeletion = default!;
+    private EmployeeTimeIn? _confirmEmployeeTimeInDeletion = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshEmployee();
+    }
+
+    private async Task RefreshEmployee()
+    {
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var response = await EmployeeService
+                .AddParameter("CompleteInformation")
+                .AddParameter(id)
+                .GetAsync<EmployeeCompleteInformation>(httpContext);
+
+            if (response.Successful && response.Data is not null)
+            {
+                EmployeeInfo = response.Data;
+            }
+        }
+    }
+
+    private async Task Save()
+    {
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var response = await EmployeeService.PatchAsync<string>(httpContext, EmployeeInfo);
+
+            if (response.Successful)
+            {
+                ToastService.ShowSuccess("Employee successfully updated.");
+            }
+            else
+            {
+                ToastService.ShowError("Something went wrong. The changes weren't saved. Try again later.");
+            }
+        }
+    }
+
+    private void AddEmploymentRange()
+    {
+        EmployeeInfo.EmploymentDates ??= new List<EmploymentDate>();
+
+        EmployeeInfo.EmploymentDates.Add(new EmploymentDate
+            {
+                EmployeeId = EmployeeInfo.Employee.Id,
+                MonthHired = DateTime.UtcNow.Month,
+                YearHired = DateTime.UtcNow.Year,
+                YearTerminated = default!,
+                MonthTerminated = default!
+            });
+
+        StateHasChanged();
+    }
+
+    private void RemoveEmploymentDate(EmploymentDate? ed)
+    {
+        _confirmEmploymentDateDeletion = default!;
+        EmployeeInfo.EmploymentDates.Remove(ed);
+    }
+
+    private void SetTerminationDate(EmploymentDate? ed)
+    {
+        var terminationDate = EmployeeInfo.EmploymentDates.AvailableTerminationDates(ed).FirstOrDefault();
+        ed.YearTerminated = terminationDate?.Year ?? DateTime.UtcNow.Year;
+        ed.MonthTerminated = terminationDate?.Month ?? DateTime.UtcNow.Month;
+        StateHasChanged();
+    }
+
+    private void AddTimeIn()
+    {
+        EmployeeInfo.TimeIns ??= new List<EmployeeTimeIn>();
+        var latestTimeIn = EmployeeInfo.TimeIns.OrderBy(e => e.Year).ThenBy(e => e.Month).LastOrDefault()
+        ?? new EmployeeTimeIn { Month = DateTime.UtcNow.Month, Year = DateTime.UtcNow.Year };
+
+        var succeeding = new DateTime(latestTimeIn.Year, latestTimeIn.Month, 1).AddMonths(1);
+
+        EmployeeInfo.TimeIns.Add(new EmployeeTimeIn
+        {
+            Month = succeeding.Month,
+            Year = succeeding.Year,
+            TimeIn = TimeOnly.MinValue
+        });
+
+        StateHasChanged();
+    }
+
+    private void RemoveTimeIn(EmployeeTimeIn timeIn)
+    {
+        EmployeeInfo.TimeIns.Remove(timeIn);
+    }
+
+    private Dictionary<int, string> GetAvailableTimeInMonths(int year, params int[] includeMonths)
+    {
+        var usedDates = EmployeeInfo.TimeIns?.Select(t => DateOnly.FromDateTime(new DateTime(t.Year, t.Month, 1))) ?? new List<DateOnly>();
+        var availableMonths = new Dictionary<int, string>();
+        foreach (var kvp in DateExtensions.Months)
+        {
+            if (includeMonths.Contains(kvp.Key) || !usedDates.Any(u => u.Year == year && u.Month == kvp.Key))
+            {
+                availableMonths.Add(kvp.Key, kvp.Value);
+            }
+        }
+
+        return availableMonths;
+    }
+
+    private int[] GetAvailableEmploymentDateYears(EmploymentDate? ed)
+    {
+        int max = DateTime.UtcNow.Year;
+
+        if (ed is null || !ed.YearTerminated.HasValue || !ed.MonthTerminated.HasValue)
+        {
+            return Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1).ToArray();
+        }
+
+        if (ed.YearTerminated.Value == DateExtensions.MIN_SYSTEM_YEAR)
+        {
+            return [ DateExtensions.MIN_SYSTEM_YEAR ];
+        }
+
+        if (ed.MonthTerminated.Value == 1)
+        {
+            return Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, ed.YearTerminated.Value - DateExtensions.MIN_SYSTEM_YEAR).ToArray();
+        }
+
+        return Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1).ToArray();
+    }
+
+    private int[] GetAvailableTerminationDateYears(EmploymentDate? ed)
+    {
+        int max = DateTime.UtcNow.Year;
+
+        if (ed is null)
+        {
+            return Enumerable.Range(DateExtensions.MIN_SYSTEM_YEAR, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1).ToArray();
+        }
+        else
+        {
+            if (ed.MonthHired == 12)
+            {
+                return Enumerable.Range(ed.YearHired + 1, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR).ToArray();
+            }
+            else
+            {
+                return Enumerable.Range(ed.YearHired, DateExtensions.MAX_SYSTEM_YEAR - DateExtensions.MIN_SYSTEM_YEAR + 1).ToArray();
+            }
+        }
+    }
+}

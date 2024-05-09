@@ -1,0 +1,75 @@
+﻿
+@rendermode InteractiveServer
+
+<div>
+    @if (EmployeeInfractions is not null && Infractions is not null)
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <td><small>Description</small></td>
+                    <td><small>Amount per Infraction</small></td>
+                    <td><small>Total Infractions</small></td>
+                    <td><small>Total Infraction Amount</small></td>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var infraction in Infractions)
+                {
+                    <tr>
+                        <td><small>@infraction.Description</small></td>
+                        <td class="text-secondary">@infraction.Amount.ToString("N2")</td>
+                        <td class="text-secondary">@GetTotalInfractions(infraction.Id)</td>
+                        <td class="text-secondary">@GetTotalInfractionAmount(infraction.Id).ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2">Total</th>
+                    <th>@GetTotalInfractions()</th>
+                    <th>@GetTotalInfractionAmount().ToString("N2")</th>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</div>
+@code {
+    [Parameter] public IEnumerable<Infraction> Infractions { get; set; }
+    [Parameter] public IEnumerable<CompositeEmployeeInfraction> EmployeeInfractions { get; set; }
+
+    private int GetTotalInfractions(int? infractionId = null)
+    {
+        int total = 0;
+
+        var infractions = GetInfractions(infractionId);
+
+        total = infractions.Sum(i => i.Count);
+
+        return total;
+    }
+
+    private double GetTotalInfractionAmount(int? infractionId = null)
+    {
+        double total = 0.00d;
+
+        var infractions = GetInfractions(infractionId);
+
+        total = infractions.Sum(i => i.Count * i.Infraction.Amount);
+
+        return total;
+    }
+
+    private IEnumerable<CompositeInfraction> GetInfractions(int? infractionId = null)
+    {
+        IEnumerable<CompositeInfraction> infractions = new List<CompositeInfraction>();
+
+        if (EmployeeInfractions is not null)
+        {
+            infractions = EmployeeInfractions
+                .SelectMany(ei => ei.Infractions.Where(i => infractionId == null || i.Infraction.Id == infractionId));
+        }
+
+        return infractions;
+    }
+}

@@ -1,0 +1,113 @@
+﻿@inject MessageService<InfractionEndpoint> InfractionService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Navigationmanager
+
+@rendermode InteractiveServer
+
+<div class="d-flex flex-row mb-3">
+    <button class="btn" disabled="@(Year <= DateExtensions.MIN_SYSTEM_YEAR)" @onclick="(async () => await RefreshYear(-1))">
+        <i class="bi bi-caret-left"></i>
+    </button>
+    <h3 class="ms-3 me-3">@Year</h3>
+    <button class="btn" disabled="@(Year >= DateTime.UtcNow.Year)" @onclick="(async () => await RefreshYear(1))">
+        <i class="bi bi-caret-right"></i>
+    </button>
+</div>
+
+<div class="row">
+    @foreach (var date in DateExtensions.GetSelectableDatesToPresent().Where(d => d.Year == Year))
+    {
+        var infractions = InfractionSummary?.Where(i => i.Month == date.Month) ?? [];
+        <div class="col-xl-3 col-lg-4 col-md-6" @onclick="@(() => Navigationmanager.NavigateTo($"EditEmployeeInfraction/{EmployeeId}/{date.Month}-{date.Year}"))">
+            <div class="month">
+                <strong class="text-secondary">@date.Value.ToUpper()</strong>
+                <div class="text-secondary">
+                    <div><small>Incentives: @Math.Max(InfractionExtensions.TOTAL_INCENTIVE - infractions.Sum(i => i.Count * i.AmountPerInfraction), 0).ToString("N2")</small></div>
+                    <div><small>Deductions: @Math.Min(infractions.Sum(i => i.Count * i.AmountPerInfraction), InfractionExtensions.TOTAL_INCENTIVE).ToString("N2")</small></div>
+                </div>
+                <span class="infraction-div">
+                    @foreach (var infraction in infractions)
+                    {
+                        <span class="@InfractionExtensions.InfractionClass[infraction.InfractionId]" title="Count: @infraction.Count">
+                            @foreach (var count in Enumerable.Range(1, infraction.Count))
+                            {
+                                <i class="bi bi-circle-fill infraction animated-infraction"></i>
+                            }
+                        </span>
+                    }
+                </span>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="text-secondary mb-4">
+    @if (Infractions is not null)
+    {
+        @foreach (var infraction in Infractions)
+        {
+            <div class="row">
+                <div class="col-1 text-center">
+                    <i class="bi bi-circle-fill @InfractionExtensions.InfractionClass[infraction.Id]" style="font-size: 9px;"></i>
+                </div>
+                <div class="col-11">
+                    <small style="font-size: 11px;">
+                        @infraction.Description
+                    </small>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private int test = 0;
+    [Parameter] public int EmployeeId { get; set; }
+    public IEnumerable<AnnualInfractionSummary> InfractionSummary { get; set; } = default!;
+    public IEnumerable<Infraction> Infractions { get; set; } = default!;
+    public int Year { get; set; } = DateTime.UtcNow.Year;
+
+    protected override async Task OnInitializedAsync()
+    {
+        test = 0;
+        await RefreshAnnualInfractionSummaryAsync();
+    }
+
+    private async Task RefreshAnnualInfractionSummaryAsync()
+    {
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var response = await InfractionService
+                .AddParameter(Year)
+                .AddParameter(EmployeeId)
+                .GetAsync<IEnumerable<AnnualInfractionSummary>>(httpContext);
+
+            if (response.Successful && response.Data is not null)
+            {
+                InfractionSummary = response.Data;
+            }
+        }
+
+        await RefreshInfractions();
+    }
+
+    private async Task RefreshInfractions()
+    {
+        if (HttpContextAccessor.HttpContext is HttpContext httpContext)
+        {
+            var response = await InfractionService.GetAsync<IEnumerable<Infraction>>(httpContext);
+
+            if (response.Successful && response.Data is not null)
+            {
+                Infractions = response.Data;
+            }
+        }
+    }
+
+    private async Task RefreshYear(int increment)
+    {
+        Year += increment;
+
+        await RefreshAnnualInfractionSummaryAsync();
+    }
+}

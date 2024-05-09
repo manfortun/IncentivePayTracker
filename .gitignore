@@ -1,0 +1,13 @@
+
+/IncentivePayTracker.API/.vs
+/IncentivePayTracker.API/bin
+/IncentivePayTracker.API/obj
+/IncentivePayTracker.Blazor/.vs
+/IncentivePayTracker.Blazor/bin
+/IncentivePayTracker.Blazor/obj
+/IncentivePayTracker.DTO/.vs
+/IncentivePayTracker.DTO/bin
+/IncentivePayTracker.DTO/obj
+/IncentivePayTracker.Services/ExcelImporter/.vs
+/IncentivePayTracker.Services/ExcelImporter/bin
+/IncentivePayTracker.Services/ExcelImporter/obj

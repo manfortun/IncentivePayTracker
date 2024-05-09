@@ -1,0 +1,8 @@
+﻿@if (Show)
+{
+    <i class="ms-1 me-1 bi bi-patch-check-fill text-primary" style="font-size: 12px; vertical-align: text-bottom" title="This person is exempted."></i>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; } = false;
+}

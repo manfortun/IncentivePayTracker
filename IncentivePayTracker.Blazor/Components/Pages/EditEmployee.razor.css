@@ -1,0 +1,12 @@
+﻿small {
+    color: dimgray;
+}
+
+.history-div > div > div {
+    border: solid 1px dodgerblue;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 5px;
+    min-height: 8rem;
+    color: dodgerblue;
+}

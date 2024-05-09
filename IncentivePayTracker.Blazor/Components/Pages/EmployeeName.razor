@@ -1,0 +1,11 @@
+﻿
+<span class="text-secondary"><strong class="text-black">@Employee.LastName</strong>, @ToTitleCase(Employee.FirstName)</span>
+
+@code {
+    [Parameter] public Employee Employee { get; set; } = default!;
+
+    private string ToTitleCase(string input)
+    {
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+    }
+}
